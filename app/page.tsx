@@ -796,7 +796,7 @@ export default function Home() {
                     
                     <div className="text-center text-sm text-gray-600 dark:text-gray-400">
                       <p>
-                        Enter your email and we'll send you a magic link to log in. 
+                        Enter your email and we&apos;ll send you a magic link to log in. 
                         New users will be created automatically.
                       </p>
                     </div>

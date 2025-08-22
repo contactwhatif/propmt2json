@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaTimes, FaCheck } from "react-icons/fa";
-// import { useTheme } from "next-themes";
 import { createClient } from '@supabase/supabase-js';
 import Image from "next/image";
 
@@ -24,7 +23,6 @@ export default function Home() {
   }>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
-  // const { theme, setTheme } = useTheme();
   
   // Authentication states
   interface SupabaseSession {
@@ -37,6 +35,7 @@ export default function Home() {
       };
       [key: string]: unknown;
     };
+    access_token?: string;
     [key: string]: unknown;
   }
   const [session, setSession] = useState<SupabaseSession | null>(null);
@@ -181,12 +180,24 @@ export default function Home() {
     const form = new FormData(e.target as HTMLFormElement);
     const promptType = form.get("promptType");
     const outputFormat = form.get("outputFormat");
+
     try {
+      // Get the access token from the session
+      const { data: { session: supaSession } } = await supabase.auth.getSession();
+      if (!supaSession) {
+        showNotification("Session expired. Please log in again.", "error");
+        return;
+      }
+
       const res = await fetch("/api/prompt", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supaSession.access_token}`
+        },
         body: JSON.stringify({ promptType, outputFormat, userPrompt }),
       });
+
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResult(parseResponse(data.aiResponse, outputFormat as string));
@@ -609,9 +620,11 @@ export default function Home() {
                         <p className="text-gray-700 dark:text-gray-300 mb-2">
                           <span className="font-medium">{session.user.email}</span>
                         </p>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          Industry: <span className="font-medium">{session.user.user_metadata?.industry || "Not specified"}</span>
-                        </div>
+                        {session.user.user_metadata?.industry && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            Industry: <span className="font-medium">{session.user.user_metadata.industry}</span>
+                          </div>
+                        )}
                         <button 
                           onClick={handleLogout}
                           className="w-full flex items-center justify-center py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
@@ -625,7 +638,7 @@ export default function Home() {
                       {showIndustryForm && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
                           <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                            Complete Your Profile After Refresh Page
+                            Complete Your Profile
                           </h4>
                           <form onSubmit={handleIndustryUpdate} className="space-y-3">
                             <div>

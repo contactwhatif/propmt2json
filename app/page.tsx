@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaBuilding, FaTimes, FaCheck } from "react-icons/fa";
+import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaTimes, FaCheck } from "react-icons/fa";
+// import { useTheme } from "next-themes";
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
@@ -13,13 +14,31 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<null | {
+    sentiment: string;
+    intent: string;
+    requirements: string;
+    expectations: string;
+    structured: string;
+  }>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
- 
+  // const { theme, setTheme } = useTheme();
   
   // Authentication states
-  const [session, setSession] = useState<any>(null);
+  interface SupabaseSession {
+    user: {
+      id: string;
+      email?: string;
+      user_metadata?: {
+        industry?: string;
+        [key: string]: unknown;
+      };
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  }
+  const [session, setSession] = useState<SupabaseSession | null>(null);
   const [email, setEmail] = useState("");
   const [industry, setIndustry] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -49,33 +68,37 @@ export default function Home() {
           localStorage.removeItem('supabaseSession');
         }
       }
-      
       // Then check with Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setSession(session);
-        localStorage.setItem('supabaseSession', JSON.stringify(session));
-        
+      const { data: { session: supaSession } } = await supabase.auth.getSession();
+      if (supaSession) {
+        // Map Supabase Session.User to local SupabaseSession type
+        const mappedSession: SupabaseSession = {
+          ...supaSession,
+          user: {
+            ...supaSession.user,
+            email: supaSession.user.email,
+          }
+        };
+        setSession(mappedSession);
+        localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
         // Check if user has industry set
-        if (!session.user.user_metadata?.industry) {
+        if (!supaSession.user.user_metadata?.industry) {
           setShowIndustryForm(true);
         }
-        
         // Save user data to profiles table if it doesn't exist
         try {
           const { data: existingProfile } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('id', supaSession.user.id)
             .single();
-          
           if (!existingProfile) {
             await supabase
               .from('profiles')
               .insert([{ 
-                id: session.user.id, 
-                email: session.user.email, 
-                industry: session.user.user_metadata?.industry || '' 
+                id: supaSession.user.id, 
+                email: supaSession.user.email ?? '', 
+                industry: supaSession.user.user_metadata?.industry || '' 
               }]);
           }
         } catch (error) {
@@ -89,38 +112,43 @@ export default function Home() {
     
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event, session);
-        setSession(session);
-        if (session) {
-          localStorage.setItem('supabaseSession', JSON.stringify(session));
-          
+      async (event, authSession) => {
+        console.log("Auth state changed:", event, authSession);
+        if (authSession) {
+          const mappedSession: SupabaseSession = {
+            ...authSession,
+            user: {
+              ...authSession.user,
+              email: authSession.user.email,
+            }
+          };
+          setSession(mappedSession);
+          localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
           // Check if user has industry set
-          if (!session.user.user_metadata?.industry) {
+          if (!authSession.user.user_metadata?.industry) {
             setShowIndustryForm(true);
           }
-          
           // Save user data to profiles table if it doesn't exist
           try {
             const { data: existingProfile } = await supabase
               .from('profiles')
               .select('*')
-              .eq('id', session.user.id)
+              .eq('id', authSession.user.id)
               .single();
-            
             if (!existingProfile) {
               await supabase
                 .from('profiles')
                 .insert([{ 
-                  id: session.user.id, 
-                  email: session.user.email, 
-                  industry: session.user.user_metadata?.industry || '' 
+                  id: authSession.user.id, 
+                  email: authSession.user.email ?? '', 
+                  industry: authSession.user.user_metadata?.industry || '' 
                 }]);
             }
           } catch (error) {
             console.error('Error saving user profile:', error);
           }
         } else {
+          setSession(null);
           localStorage.removeItem('supabaseSession');
           setShowIndustryForm(false);
         }
@@ -131,7 +159,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!userPrompt.trim()) {
       showNotification("Please enter a prompt", "error");
@@ -151,8 +179,12 @@ export default function Home() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResult(parseResponse(data.aiResponse, outputFormat as string));
-    } catch (err: any) {
-      showNotification(err.message, "error");
+    } catch (err) {
+      if (err instanceof Error) {
+        showNotification(err.message, "error");
+      } else {
+        showNotification("An unknown error occurred", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -187,7 +219,7 @@ export default function Home() {
   };
 
   // Handle authentication - unified for login and signup
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAuthLoading(true);
     
@@ -210,8 +242,12 @@ export default function Home() {
         setShowAuthModal(false);
         setEmailSent(false);
       }, 3000);
-    } catch (error: any) {
-      showNotification(error.message, "error");
+    } catch (error) {
+      if (error instanceof Error) {
+        showNotification(error.message, "error");
+      } else {
+        showNotification("An unknown error occurred", "error");
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -227,7 +263,7 @@ export default function Home() {
   };
 
   // Handle industry update
-  const handleIndustryUpdate = async (e: React.FormEvent) => {
+  const handleIndustryUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!industry.trim()) {
@@ -244,37 +280,40 @@ export default function Home() {
       if (metadataError) throw metadataError;
       
       // Update profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ industry })
-        .eq('id', session.user.id);
-      
-      if (profileError) throw profileError;
-      
-      // Update local session
-      const updatedSession = {
-        ...session,
-        user: {
-          ...session.user,
-          user_metadata: {
-            ...session.user.user_metadata,
-            industry
+      if (session) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ industry })
+          .eq('id', session.user.id);
+        if (profileError) throw profileError;
+        // Update local session
+        const updatedSession = {
+          ...session,
+          user: {
+            ...session.user,
+            user_metadata: {
+              ...session.user.user_metadata,
+              industry
+            }
           }
-        }
-      };
-      setSession(updatedSession);
-      localStorage.setItem('supabaseSession', JSON.stringify(updatedSession));
-      
-      setShowIndustryForm(false);
-      setIndustry("");
-      showNotification("Industry updated successfully!", "success");
-    } catch (error: any) {
-      showNotification(error.message, "error");
+        };
+        setSession(updatedSession);
+        localStorage.setItem('supabaseSession', JSON.stringify(updatedSession));
+        setShowIndustryForm(false);
+        setIndustry("");
+        showNotification("Industry updated successfully!", "success");
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        showNotification(error.message, "error");
+      } else {
+        showNotification("An unknown error occurred", "error");
+      }
     }
   };
 
   // Handle feedback submission
-  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+  const handleFeedbackSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!feedback.trim()) {
       showNotification("Please enter your feedback", "error");
@@ -304,7 +343,7 @@ export default function Home() {
       
       setFeedback("");
       setShowFeedbackModal(false);
-    } catch (error: any) {
+    } catch (error) {
       console.log('Error submitting feedback:', error);
       showNotification("Thank you for your feedback!", "success");
       setFeedback("");
@@ -718,7 +757,7 @@ export default function Home() {
                       Check Your Email
                     </h4>
                     <p className="text-gray-600 dark:text-gray-300">
-                      We've sent you a magic link to log in. If you're new, we'll create your account automatically.
+                      We&apos;ve sent you a magic link to log in. If you&apos;re new, we&apos;ll create your account automatically.
                     </p>
                   </div>
                 ) : (

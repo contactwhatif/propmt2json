@@ -11,7 +11,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(req: Request) {
-  // Validate the authorization header
   const authHeader = req.headers.get("authorization");
   if (!authHeader) {
     console.error("No authorization header provided");
@@ -22,9 +21,11 @@ export async function POST(req: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
-    console.error("User authentication failed:", authError?.message || "No user found");
+    console.error("User authentication failed:", authError?.message || "No user found", "Token:", token);
     return NextResponse.json({ error: "User not found or invalid token" }, { status: 401 });
   }
+
+  console.log("Authenticated user:", user.email, "ID:", user.id);
 
   let body;
   try {
@@ -74,16 +75,11 @@ STRUCTURED_${outputFormat.toUpperCase()}:
 `;
 
   try {
-    // Dynamically set HTTP-Referer from request headers if possible
     let referer = "http://localhost:3000";
     const origin = req.headers.get("origin");
-    if (origin) {
-      referer = origin;
-    } else if (process.env.VERCEL_URL) {
-      referer = `https://${process.env.VERCEL_URL}`;
-    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
-      referer = process.env.NEXT_PUBLIC_SITE_URL;
-    }
+    if (origin) referer = origin;
+    else if (process.env.VERCEL_URL) referer = `https://${process.env.VERCEL_URL}`;
+    else if (process.env.NEXT_PUBLIC_SITE_URL) referer = process.env.NEXT_PUBLIC_SITE_URL;
 
     if (!process.env.OPENROUTER_API_KEY) {
       console.error("Missing OPENROUTER_API_KEY");

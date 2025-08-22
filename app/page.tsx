@@ -383,7 +383,7 @@ export default function Home() {
               
               {/* GitHub Repository Link */}
               <a 
-                href="https://github.com/yourusername/ai-prompt-structurer" 
+                href="https://github.com/contactwhatif/propmt2json.git" 
                 target="_blank" 
                 className="p-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors"
                 title="View on GitHub"

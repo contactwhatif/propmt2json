@@ -1,16 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
-import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaTimes, FaCheck } from "react-icons/fa";
-import { createClient } from '@supabase/supabase-js';
+import { useState } from "react";
+import { FaGithub, FaComment } from "react-icons/fa";
 import Image from "next/image";
 
-// Initialize Supabase client
+// Initialize Supabase client (kept for potential future use, but not used here)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
 }
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -23,242 +21,50 @@ export default function Home() {
   }>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
-  
-  // Authentication states
-  interface SupabaseSession {
-    user: {
-      id: string;
-      email?: string;
-      user_metadata?: {
-        industry?: string;
-        [key: string]: unknown;
-      };
-      [key: string]: unknown;
-    };
-    access_token?: string;
-    [key: string]: unknown;
-  }
-  const [session, setSession] = useState<SupabaseSession | null>(null);
-  const [email, setEmail] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [loadingSession, setLoadingSession] = useState(true);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const [showIndustryForm, setShowIndustryForm] = useState(false);
-  
-  // Feedback states
-  const [feedback, setFeedback] = useState("");
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-
-  // Check for existing session on component mount
-  useEffect(() => {
-    const getSession = async () => {
-      setLoadingSession(true);
-      try {
-        // First check localStorage
-        const savedSession = localStorage.getItem('supabaseSession');
-        if (savedSession) {
-          try {
-            const parsedSession = JSON.parse(savedSession);
-            setSession(parsedSession);
-          } catch (e) {
-            console.error('Error parsing saved session:', e);
-            localStorage.removeItem('supabaseSession');
-          }
-        }
-        // Then check with Supabase
-        const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          showNotification('Failed to fetch session from Supabase.', 'error');
-          console.error('Session error:', sessionError);
-        }
-        if (supaSession) {
-          // Map Supabase Session.User to local SupabaseSession type
-          const mappedSession: SupabaseSession = {
-            ...supaSession,
-            user: {
-              ...supaSession.user,
-              email: supaSession.user.email,
-            }
-          };
-          setSession(mappedSession);
-          localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
-          // Check if user has industry set
-          if (!supaSession.user.user_metadata?.industry) {
-            setShowIndustryForm(true);
-          }
-          // Upsert user data to profiles table (insert or update)
-          try {
-            const { error: upsertError } = await supabase
-              .from('profiles')
-              .upsert([
-                {
-                  id: supaSession.user.id,
-                  email: supaSession.user.email ?? '',
-                  industry: supaSession.user.user_metadata?.industry || ''
-                }
-              ], { onConflict: 'id' });
-            if (upsertError) {
-              showNotification('Error saving user profile.', 'error');
-              console.error('Error upserting user profile:', upsertError);
-            }
-          } catch (error) {
-            showNotification('Error saving user profile.', 'error');
-            console.error('Error upserting user profile:', error);
-          }
-        }
-      } catch (err) {
-        showNotification('An error occurred while loading session.', 'error');
-        console.error('Session load error:', err);
-      } finally {
-        setLoadingSession(false);
-      }
-    };
-    
-    getSession();
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, authSession) => {
-        console.log("Auth state changed:", event, authSession);
-        if (authSession) {
-          const mappedSession: SupabaseSession = {
-            ...authSession,
-            user: {
-              ...authSession.user,
-              email: authSession.user.email,
-            }
-          };
-          setSession(mappedSession);
-          localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
-          // Check if user has industry set
-          if (!authSession.user.user_metadata?.industry) {
-            setShowIndustryForm(true);
-          }
-          // Upsert user data to profiles table (insert or update)
-          try {
-            const { error: upsertError } = await supabase
-              .from('profiles')
-              .upsert([
-                {
-                  id: authSession.user.id,
-                  email: authSession.user.email ?? '',
-                  industry: authSession.user.user_metadata?.industry || ''
-                }
-              ], { onConflict: 'id' });
-            if (upsertError) {
-              console.error('Error upserting user profile:', upsertError);
-            }
-          } catch (error) {
-            console.error('Error upserting user profile:', error);
-          }
-        } else {
-          setSession(null);
-          localStorage.removeItem('supabaseSession');
-          setShowIndustryForm(false);
-        }
-        setLoadingSession(false);
-      }
-    );
-    
-    return () => subscription.unsubscribe();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  if (!session) {
-    showNotification("Please log in to generate structured output.", "error");
-    setLoading(false);
-    return;
-  }
-  if (!userPrompt.trim()) {
-    showNotification("Please enter a prompt", "error");
-    setLoading(false);
-    return;
-  }
-  setLoading(true);
-  setResult(null);
-  const form = new FormData(e.target as HTMLFormElement);
-  const promptType = form.get("promptType");
-  const outputFormat = form.get("outputFormat");
-
-  try {
-    // Force session refresh to ensure a valid token
-    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError || !refreshedSession) {
-      throw new Error("Failed to refresh session. Please log in again.");
+    e.preventDefault();
+    if (!userPrompt.trim()) {
+      showNotification("Please enter a prompt", "error");
+      setLoading(false);
+      return;
     }
+    setLoading(true);
+    setResult(null);
+    const form = new FormData(e.target as HTMLFormElement);
+    const promptType = form.get("promptType");
+    const outputFormat = form.get("outputFormat");
 
-    const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !supaSession) {
-      throw new Error("Session expired. Please log in again.");
-    }
+    try {
+      const res = await fetch("/api/prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promptType, outputFormat, userPrompt }),
+      });
 
-    // Update local session state
-    const mappedSession: SupabaseSession = {
-      ...supaSession,
-      user: {
-        ...supaSession.user,
-        email: supaSession.user.email,
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `API request failed with status ${res.status}`);
       }
-    };
-    setSession(mappedSession);
-    localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
-
-    // Ensure user exists in profiles table
-    const { error: upsertError } = await supabase
-      .from('profiles')
-      .upsert([
-        {
-          id: supaSession.user.id,
-          email: supaSession.user.email ?? '',
-          industry: supaSession.user.user_metadata?.industry || ''
-        }
-      ], { onConflict: 'id' });
-    if (upsertError) {
-      console.error("Error upserting profile:", upsertError);
+      if (!data.aiResponse) {
+        throw new Error("No AI response received");
+      }
+      const parsedResult = parseResponse(data.aiResponse, outputFormat as string);
+      setResult(parsedResult);
+    } catch (err) {
+      console.error("Error in handleSubmit:", err);
+      if (err instanceof Error) {
+        showNotification(err.message, "error");
+      } else {
+        showNotification("An unknown error occurred", "error");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    // Delay to ensure session and profile sync
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const res = await fetch("/api/prompt", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${supaSession.access_token}`
-      },
-      body: JSON.stringify({ promptType, outputFormat, userPrompt }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || `API request failed with status ${res.status}`);
-    }
-    if (!data.aiResponse) {
-      throw new Error("No AI response received");
-    }
-    const parsedResult = parseResponse(data.aiResponse, outputFormat as string);
-    setResult(parsedResult);
-  } catch (err) {
-    console.error("Error in handleSubmit:", err);
-    if (err instanceof Error) {
-      showNotification(err.message, "error");
-    } else {
-      showNotification("An unknown error occurred", "error");
-    }
-    // Ensure loading stops even on error
-    setLoading(false);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const parseResponse = (aiResponse: string, outputFormat: string) => {
     try {
-      // Fixed regex patterns by removing the 's' flag and using [\s\S] instead
       const sentimentMatch = aiResponse.match(/SENTIMENT:\s*([\s\S]+?)(?=\nINTENT:|$)/);
       const intentMatch = aiResponse.match(/INTENT:\s*([\s\S]+?)(?=\nREQUIREMENTS:|$)/);
       const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([\s\S]+?)(?=\nEXPECTATIONS:|$)/);
@@ -296,148 +102,6 @@ export default function Home() {
     }
   };
 
-  // Handle authentication - unified for login and signup
-  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    
-    try {
-      // Send magic link for both login and signup
-      const { error } = await supabase.auth.signInWithOtp({ 
-        email,
-        options: {
-          emailRedirectTo: window.location.origin
-        }
-      });
-      
-      if (error) throw error;
-      
-      showNotification("Check your email for the login link!", "success");
-      setEmailSent(true);
-      
-      // Close modal after 3 seconds
-      setTimeout(() => {
-        setShowAuthModal(false);
-        setEmailSent(false);
-      }, 3000);
-    } catch (error) {
-      if (error instanceof Error) {
-        showNotification(error.message, "error");
-      } else {
-        showNotification("An unknown error occurred", "error");
-      }
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Handle logout
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    localStorage.removeItem('supabaseSession');
-    setShowIndustryForm(false);
-    showNotification("Logged out successfully", "success");
-  };
-
-  // Handle industry update
-  const handleIndustryUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    if (!industry.trim()) {
-      showNotification("Please enter your industry", "error");
-      return;
-    }
-    
-    try {
-      // Update user metadata
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: { industry }
-      });
-      
-      if (metadataError) throw metadataError;
-      
-      // Update profiles table
-      if (session) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ industry })
-          .eq('id', session.user.id);
-        if (profileError) throw profileError;
-        // Update local session
-        const updatedSession = {
-          ...session,
-          user: {
-            ...session.user,
-            user_metadata: {
-              ...session.user.user_metadata,
-              industry
-            }
-          }
-        };
-        setSession(updatedSession);
-        localStorage.setItem('supabaseSession', JSON.stringify(updatedSession));
-        setShowIndustryForm(false);
-        setIndustry("");
-        showNotification("Industry updated successfully!", "success");
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        showNotification(error.message, "error");
-      } else {
-        showNotification("An unknown error occurred", "error");
-      }
-    }
-  };
-
-  // Handle feedback submission
-  const handleFeedbackSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!feedback.trim()) {
-      showNotification("Please enter your feedback", "error");
-      return;
-    }
-    
-    setFeedbackLoading(true);
-    
-    try {
-      // Save feedback to Supabase
-      const { error } = await supabase
-        .from('feedback')
-        .insert([
-          { 
-            content: feedback,
-            user_email: session?.user?.email || 'anonymous',
-            created_at: new Date().toISOString()
-          }
-        ]);
-      
-      if (error) {
-        console.log('Feedback submission failed:', error);
-        showNotification("Thank you for your feedback!", "success");
-      } else {
-        showNotification("Thank you for your feedback!", "success");
-      }
-      
-      setFeedback("");
-      setShowFeedbackModal(false);
-    } catch (error) {
-      console.log('Error submitting feedback:', error);
-      showNotification("Thank you for your feedback!", "success");
-      setFeedback("");
-      setShowFeedbackModal(false);
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
-
-  // Open auth modal and reset form
-  const openAuthModal = () => {
-    setEmail("");
-    setEmailSent(false);
-    setShowAuthModal(true);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
       {/* Sticky Header */}
@@ -468,35 +132,14 @@ export default function Home() {
                 <FaGithub />
               </a>
               
-              {/* Feedback Button - only when logged in */}
-              {session && (
-                <button 
-                  onClick={() => setShowFeedbackModal(true)}
-                  className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors"
-                  title="Send Feedback"
-                >
-                  <FaComment />
-                </button>
-              )}
-              
-              {/* Authentication Button */}
-              {session ? (
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 bg-red-600 text-white rounded-full hover:bg-red-500 transition-colors"
-                  title="Logout"
-                >
-                  <FaSignOutAlt />
-                </button>
-              ) : (
-                <button 
-                  onClick={openAuthModal}
-                  className="p-2 bg-green-600 text-white rounded-full hover:bg-green-500 transition-colors"
-                  title="Login / Sign Up"
-                >
-                  <FaUser />
-                </button>
-              )}
+              {/* Feedback Button */}
+              <button 
+                onClick={() => setShowFeedbackModal(true)}
+                className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors"
+                title="Send Feedback"
+              >
+                <FaComment />
+              </button>
             </div>
           </div>
         </div>
@@ -626,7 +269,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
           
           {/* Sidebar */}
@@ -652,96 +295,6 @@ export default function Home() {
               </div>
               
               <div className="p-6 flex-grow overflow-y-auto">
-                {/* User Account Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center">
-                    <FaUser className="mr-2 text-blue-500" />
-                    Account
-                  </h3>
-                  
-                  {loadingSession ? (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 text-center">
-                      <div className="w-6 h-6 border-t-2 border-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
-                      <p className="text-gray-600 dark:text-gray-300">Loading session...</p>
-                    </div>
-                  ) : session ? (
-                    <div className="space-y-4">
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                        <div className="flex items-center mb-3">
-                          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                          <p className="text-gray-700 dark:text-gray-300 font-medium">
-                            Logged in
-                          </p>
-                        </div>
-                        <p className="text-gray-700 dark:text-gray-300 mb-2">
-                          <span className="font-medium">{session.user.email}</span>
-                        </p>
-                        {session.user.user_metadata?.industry && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                            Industry: <span className="font-medium">{session.user.user_metadata.industry}</span>
-                          </div>
-                        )}
-                        <button 
-                          onClick={handleLogout}
-                          className="w-full flex items-center justify-center py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                        >
-                          <FaSignOutAlt className="mr-2" />
-                          Logout
-                        </button>
-                      </div>
-                      
-                      {/* Industry Form */}
-                      {showIndustryForm && (
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
-                          <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                            Complete Your Profile
-                          </h4>
-                          <form onSubmit={handleIndustryUpdate} className="space-y-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Industry
-                              </label>
-                              <input
-                                type="text"
-                                value={industry}
-                                onChange={(e) => setIndustry(e.target.value)}
-                                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                placeholder="e.g. Technology, Marketing, Healthcare"
-                                required
-                              />
-                            </div>
-                            <button
-                              type="submit"
-                              className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                            >
-                              Save Industry
-                            </button>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 text-center">
-                      <div className="flex items-center justify-center mb-3">
-                        <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                        <p className="text-gray-700 dark:text-gray-300 font-medium">
-                          Not logged in
-                        </p>
-                      </div>
-                      <p className="text-gray-700 dark:text-gray-300 mb-3">
-                        Please log in to access all features
-                      </p>
-                      <button 
-                        onClick={openAuthModal}
-                        className="w-full flex items-center justify-center py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                      >
-                        <FaUser className="mr-2" />
-                        Login / Sign Up
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
                 <div className="mb-6">
                   <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -818,74 +371,6 @@ export default function Home() {
           </div>
         )}
         
-        {/* Authentication Modal */}
-        {showAuthModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                    Login / Sign Up
-                  </h3>
-                  <button 
-                    onClick={() => setShowAuthModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <FaTimes className="h-6 w-6" />
-                  </button>
-                </div>
-                
-                {emailSent ? (
-                  <div className="text-center py-6">
-                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FaCheck className="h-8 w-8 text-green-600 dark:text-green-400" />
-                    </div>
-                    <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">
-                      Check Your Email
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      We&apos;ve sent you a magic link to log in. If you&apos;re new, we&apos;ll create your account automatically.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleAuth} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        placeholder="your@email.com"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        disabled={authLoading}
-                        className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 font-medium"
-                      >
-                        {authLoading ? "Processing..." : "Send Magic Link"}
-                      </button>
-                    </div>
-                    
-                    <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-                      <p>
-                        Enter your email and we&apos;ll send you a magic link to log in. 
-                        New users will be created automatically.
-                      </p>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* Feedback Modal */}
         {showFeedbackModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -903,18 +388,15 @@ export default function Home() {
                   </button>
                 </div>
                 
-                <form onSubmit={handleFeedbackSubmit}>
+                <form onSubmit={(e) => { e.preventDefault(); setShowFeedbackModal(false); showNotification("Thank you for your feedback!", "success"); }}>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Your Feedback
                     </label>
                     <textarea
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
                       rows={4}
                       className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       placeholder="What do you think about our service?"
-                      required
                     />
                   </div>
                   
@@ -928,10 +410,9 @@ export default function Home() {
                     </button>
                     <button
                       type="submit"
-                      disabled={feedbackLoading}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     >
-                      {feedbackLoading ? "Sending..." : "Send Feedback"}
+                      Send Feedback
                     </button>
                   </div>
                 </form>

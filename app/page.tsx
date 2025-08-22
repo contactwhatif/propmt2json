@@ -23,7 +23,7 @@ export default function Home() {
   }>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
-  
+
   // Authentication states
   interface SupabaseSession {
     user: {
@@ -46,7 +46,7 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [showIndustryForm, setShowIndustryForm] = useState(false);
-  
+
   // Feedback states
   const [feedback, setFeedback] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -116,9 +116,9 @@ export default function Home() {
         setLoadingSession(false);
       }
     };
-    
+
     getSession();
-    
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, authSession) => {
@@ -162,7 +162,7 @@ export default function Home() {
         setLoadingSession(false);
       }
     );
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -209,7 +209,7 @@ export default function Home() {
 
       const res = await fetch("/api/prompt", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${supaSession.access_token}`
         },
@@ -245,7 +245,7 @@ export default function Home() {
       const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([\s\S]+?)(?=\nEXPECTATIONS:|$)/);
       const expectationsMatch = aiResponse.match(/EXPECTATIONS:\s*([\s\S]+?)(?=\nSTRUCTURED_|$)/);
       const structuredMatch = aiResponse.match(new RegExp(`STRUCTURED_${outputFormat.toUpperCase()}:\\s*([\\s\\S]+)`));
-      
+
       return {
         sentiment: sentimentMatch?.[1]?.trim() || "Not detected",
         intent: intentMatch?.[1]?.trim() || "Not detected",
@@ -281,21 +281,21 @@ export default function Home() {
   const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAuthLoading(true);
-    
+
     try {
       // Send magic link for both login and signup
-      const { error } = await supabase.auth.signInWithOtp({ 
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: window.location.origin
         }
       });
-      
+
       if (error) throw error;
-      
+
       showNotification("Check your email for the login link!", "success");
       setEmailSent(true);
-      
+
       // Close modal after 3 seconds
       setTimeout(() => {
         setShowAuthModal(false);
@@ -324,20 +324,20 @@ export default function Home() {
   // Handle industry update
   const handleIndustryUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!industry.trim()) {
       showNotification("Please enter your industry", "error");
       return;
     }
-    
+
     try {
       // Update user metadata
       const { error: metadataError } = await supabase.auth.updateUser({
         data: { industry }
       });
-      
+
       if (metadataError) throw metadataError;
-      
+
       // Update profiles table
       if (session) {
         const { error: profileError } = await supabase
@@ -378,28 +378,28 @@ export default function Home() {
       showNotification("Please enter your feedback", "error");
       return;
     }
-    
+
     setFeedbackLoading(true);
-    
+
     try {
       // Save feedback to Supabase
       const { error } = await supabase
         .from('feedback')
         .insert([
-          { 
+          {
             content: feedback,
             user_email: session?.user?.email || 'anonymous',
             created_at: new Date().toISOString()
           }
         ]);
-      
+
       if (error) {
         console.log('Feedback submission failed:', error);
         showNotification("Thank you for your feedback!", "success");
       } else {
         showNotification("Thank you for your feedback!", "success");
       }
-      
+
       setFeedback("");
       setShowFeedbackModal(false);
     } catch (error) {
@@ -438,20 +438,20 @@ export default function Home() {
                 Enterprise Solution
               </span>
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-              
+
               {/* GitHub Repository Link */}
-              <a 
-                href="https://github.com/yourusername/ai-prompt-structurer" 
-                target="_blank" 
+              <a
+                href="https://github.com/yourusername/ai-prompt-structurer"
+                target="_blank"
                 className="p-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors"
                 title="View on GitHub"
               >
                 <FaGithub />
               </a>
-              
+
               {/* Feedback Button - only when logged in */}
               {session && (
-                <button 
+                <button
                   onClick={() => setShowFeedbackModal(true)}
                   className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors"
                   title="Send Feedback"
@@ -459,10 +459,10 @@ export default function Home() {
                   <FaComment />
                 </button>
               )}
-              
+
               {/* Authentication Button */}
               {session ? (
-                <button 
+                <button
                   onClick={handleLogout}
                   className="p-2 bg-red-600 text-white rounded-full hover:bg-red-500 transition-colors"
                   title="Logout"
@@ -470,7 +470,7 @@ export default function Home() {
                   <FaSignOutAlt />
                 </button>
               ) : (
-                <button 
+                <button
                   onClick={openAuthModal}
                   className="p-2 bg-green-600 text-white rounded-full hover:bg-green-500 transition-colors"
                   title="Login / Sign Up"
@@ -482,7 +482,7 @@ export default function Home() {
           </div>
         </div>
       </header>
-      
+
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         <div className="flex gap-8 h-[80vh]">
           {/* Left scrollable form + results */}
@@ -515,19 +515,19 @@ export default function Home() {
                     </label>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Output Format</label>
                   <div className="grid grid-cols-3 gap-4">
                     {["json", "markdown", "xml"].map((format) => (
                       <label key={format} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer border-2 border-gray-200 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-                        <input type="radio" name="outputFormat" value="format} defaultChecked={format === "json"} className="mr-3 h-4 w-4 text-blue-600" />
+                        <input type="radio" name="outputFormat" value={format} defaultChecked={format === "json"} className="mr-3 h-4 w-4 text-blue-600" />
                         <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">{format}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Your Prompt</label>
                   <textarea
@@ -538,7 +538,7 @@ export default function Home() {
                     placeholder="Enter your prompt here..."
                   />
                 </div>
-                
+
                 <div className="flex justify-center pt-2">
                   <button type="submit" className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all transform hover:scale-[1.02]">
                     Structure My Prompt
@@ -546,7 +546,7 @@ export default function Home() {
                 </div>
               </form>
             </div>
-            
+
             {/* Results */}
             {result && (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -584,7 +584,7 @@ export default function Home() {
                       <p className="text-gray-700 dark:text-gray-300">{result.expectations}</p>
                     </div>
                   </div>
-                  
+
                   <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
                     <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-900 dark:from-gray-700 dark:to-gray-800">
                       <h3 className="text-white font-bold flex items-center">
@@ -609,7 +609,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          
+
           {/* Sidebar */}
           <div className="flex-[0.3]">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col">
@@ -631,7 +631,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-6 flex-grow overflow-y-auto">
                 {/* User Account Section */}
                 <div className="mb-6">
@@ -639,7 +639,7 @@ export default function Home() {
                     <FaUser className="mr-2 text-blue-500" />
                     Account
                   </h3>
-                  
+
                   {loadingSession ? (
                     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 text-center">
                       <div className="w-6 h-6 border-t-2 border-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
@@ -662,7 +662,7 @@ export default function Home() {
                             Industry: <span className="font-medium">{session.user.user_metadata.industry}</span>
                           </div>
                         )}
-                        <button 
+                        <button
                           onClick={handleLogout}
                           className="w-full flex items-center justify-center py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                         >
@@ -670,7 +670,7 @@ export default function Home() {
                           Logout
                         </button>
                       </div>
-                      
+
                       {/* Industry Form */}
                       {showIndustryForm && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
@@ -712,7 +712,7 @@ export default function Home() {
                       <p className="text-gray-700 dark:text-gray-300 mb-3">
                         Please log in to access all features
                       </p>
-                      <button 
+                      <button
                         onClick={openAuthModal}
                         className="w-full flex items-center justify-center py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                       >
@@ -722,7 +722,7 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="mb-6">
                   <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -732,12 +732,12 @@ export default function Home() {
                   </h3>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                     <p className="text-gray-600 dark:text-gray-300 text-sm">
-                      Passionate about leveraging AI tools to enhance marketing strategies and create compelling content. 
+                      Passionate about leveraging AI tools to enhance marketing strategies and create compelling content.
                       With 1+ years of experience in digital marketing, I specialize in SEO, content creation, and data-driven campaigns.
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="mb-6">
                   <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -753,7 +753,7 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Social Media Box */}
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                   <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center">
@@ -782,14 +782,14 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400">© 2025 JDDeveloper.com. All rights reserved.</p>
               </div>
             </div>
           </div>
         </div>
-        
+
         {notification && (
           <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center ${notification.type === "error" ? "bg-red-600" : "bg-green-600"}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -798,7 +798,7 @@ export default function Home() {
             {notification.message}
           </div>
         )}
-        
+
         {/* Authentication Modal */}
         {showAuthModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -808,14 +808,14 @@ export default function Home() {
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white">
                     Login / Sign Up
                   </h3>
-                  <button 
+                  <button
                     onClick={() => setShowAuthModal(false)}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   >
                     <FaTimes className="h-6 w-6" />
                   </button>
                 </div>
-                
+
                 {emailSent ? (
                   <div className="text-center py-6">
                     <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -843,7 +843,7 @@ export default function Home() {
                         required
                       />
                     </div>
-                    
+
                     <div className="flex space-x-2">
                       <button
                         type="submit"
@@ -853,10 +853,10 @@ export default function Home() {
                         {authLoading ? "Processing..." : "Send Magic Link"}
                       </button>
                     </div>
-                    
+
                     <div className="text-center text-sm text-gray-600 dark:text-gray-400">
                       <p>
-                        Enter your email and we&apos;ll send you a magic link to log in. 
+                        Enter your email and we&apos;ll send you a magic link to log in.
                         New users will be created automatically.
                       </p>
                     </div>
@@ -866,7 +866,7 @@ export default function Home() {
             </div>
           </div>
         )}
-        
+
         {/* Feedback Modal */}
         {showFeedbackModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -874,7 +874,7 @@ export default function Home() {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white">Send Feedback</h3>
-                  <button 
+                  <button
                     onClick={() => setShowFeedbackModal(false)}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   >
@@ -883,7 +883,7 @@ export default function Home() {
                     </svg>
                   </button>
                 </div>
-                
+
                 <form onSubmit={handleFeedbackSubmit}>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -898,7 +898,7 @@ export default function Home() {
                       required
                     />
                   </div>
-                  
+
                   <div className="flex justify-end space-x-3">
                     <button
                       type="button"

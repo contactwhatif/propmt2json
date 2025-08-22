@@ -57,54 +57,64 @@ export default function Home() {
   useEffect(() => {
     const getSession = async () => {
       setLoadingSession(true);
-      
-      // First check localStorage
-      const savedSession = localStorage.getItem('supabaseSession');
-      if (savedSession) {
-        try {
-          const parsedSession = JSON.parse(savedSession);
-          setSession(parsedSession);
-        } catch (e) {
-          console.error('Error parsing saved session:', e);
-          localStorage.removeItem('supabaseSession');
-        }
-      }
-      // Then check with Supabase
-      const { data: { session: supaSession } } = await supabase.auth.getSession();
-      if (supaSession) {
-        // Map Supabase Session.User to local SupabaseSession type
-        const mappedSession: SupabaseSession = {
-          ...supaSession,
-          user: {
-            ...supaSession.user,
-            email: supaSession.user.email,
+      try {
+        // First check localStorage
+        const savedSession = localStorage.getItem('supabaseSession');
+        if (savedSession) {
+          try {
+            const parsedSession = JSON.parse(savedSession);
+            setSession(parsedSession);
+          } catch (e) {
+            console.error('Error parsing saved session:', e);
+            localStorage.removeItem('supabaseSession');
           }
-        };
-        setSession(mappedSession);
-        localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
-        // Check if user has industry set
-        if (!supaSession.user.user_metadata?.industry) {
-          setShowIndustryForm(true);
         }
-        // Upsert user data to profiles table (insert or update)
-        try {
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert([
-              {
-                id: supaSession.user.id,
-                email: supaSession.user.email ?? '',
-                industry: supaSession.user.user_metadata?.industry || ''
-              }
-            ], { onConflict: 'id' });
-          if (upsertError) {
-            console.error('Error upserting user profile:', upsertError);
+        // Then check with Supabase
+        const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          showNotification('Failed to fetch session from Supabase.', 'error');
+        }
+        if (supaSession) {
+          // Map Supabase Session.User to local SupabaseSession type
+          const mappedSession: SupabaseSession = {
+            ...supaSession,
+            user: {
+              ...supaSession.user,
+              email: supaSession.user.email,
+            }
+          };
+          setSession(mappedSession);
+          localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
+          // Check if user has industry set
+          if (!supaSession.user.user_metadata?.industry) {
+            setShowIndustryForm(true);
           }
-        } catch (error) {
-          console.error('Error upserting user profile:', error);
+          // Upsert user data to profiles table (insert or update)
+          try {
+            const { error: upsertError } = await supabase
+              .from('profiles')
+              .upsert([
+                {
+                  id: supaSession.user.id,
+                  email: supaSession.user.email ?? '',
+                  industry: supaSession.user.user_metadata?.industry || ''
+                }
+              ], { onConflict: 'id' });
+            if (upsertError) {
+              showNotification('Error saving user profile.', 'error');
+              console.error('Error upserting user profile:', upsertError);
+            }
+          } catch (error) {
+            showNotification('Error saving user profile.', 'error');
+            console.error('Error upserting user profile:', error);
+          }
         }
+      } catch (err) {
+        showNotification('An error occurred while loading session.', 'error');
+        console.error('Session load error:', err);
+      } finally {
+        setLoadingSession(false);
       }
-      setLoadingSession(false);
     };
     
     getSession();

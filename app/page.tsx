@@ -72,6 +72,7 @@ export default function Home() {
         const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           showNotification('Failed to fetch session from Supabase.', 'error');
+          console.error('Session error:', sessionError);
         }
         if (supaSession) {
           // Map Supabase Session.User to local SupabaseSession type
@@ -169,10 +170,12 @@ export default function Home() {
     e.preventDefault();
     if (!session) {
       showNotification("Please log in to generate structured output.", "error");
+      setLoading(false);
       return;
     }
     if (!userPrompt.trim()) {
       showNotification("Please enter a prompt", "error");
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -183,9 +186,11 @@ export default function Home() {
 
     try {
       // Get the access token from the session
-      const { data: { session: supaSession } } = await supabase.auth.getSession();
-      if (!supaSession) {
+      const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !supaSession) {
         showNotification("Session expired. Please log in again.", "error");
+        console.error("Session error:", sessionError?.message || "No session");
+        setLoading(false);
         return;
       }
 
@@ -199,9 +204,16 @@ export default function Home() {
       });
 
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setResult(parseResponse(data.aiResponse, outputFormat as string));
+      if (!res.ok) {
+        throw new Error(data.error || `API request failed with status ${res.status}`);
+      }
+      if (!data.aiResponse) {
+        throw new Error("No AI response received");
+      }
+      const parsedResult = parseResponse(data.aiResponse, outputFormat as string);
+      setResult(parsedResult);
     } catch (err) {
+      console.error("Error in handleSubmit:", err);
       if (err instanceof Error) {
         showNotification(err.message, "error");
       } else {
@@ -213,19 +225,31 @@ export default function Home() {
   };
 
   const parseResponse = (aiResponse: string, outputFormat: string) => {
-    // Fixed regex patterns by removing the 's' flag and using [\s\S] instead
-    const sentimentMatch = aiResponse.match(/SENTIMENT:\s*([\s\S]+?)(?=\nINTENT:|$)/);
-    const intentMatch = aiResponse.match(/INTENT:\s*([\s\S]+?)(?=\nREQUIREMENTS:|$)/);
-    const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([\s\S]+?)(?=\nEXPECTATIONS:|$)/);
-    const expectationsMatch = aiResponse.match(/EXPECTATIONS:\s*([\s\S]+?)(?=\nSTRUCTURED_|$)/);
-    const structuredMatch = aiResponse.match(new RegExp(`STRUCTURED_${outputFormat.toUpperCase()}:\\s*([\\s\\S]+)`));
-    return {
-      sentiment: sentimentMatch?.[1] || "Not detected",
-      intent: intentMatch?.[1] || "Not detected",
-      requirements: requirementsMatch?.[1] || "Not detected",
-      expectations: expectationsMatch?.[1] || "Not detected",
-      structured: structuredMatch?.[1] || "No structured output generated"
-    };
+    try {
+      // Fixed regex patterns by removing the 's' flag and using [\s\S] instead
+      const sentimentMatch = aiResponse.match(/SENTIMENT:\s*([\s\S]+?)(?=\nINTENT:|$)/);
+      const intentMatch = aiResponse.match(/INTENT:\s*([\s\S]+?)(?=\nREQUIREMENTS:|$)/);
+      const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([\s\S]+?)(?=\nEXPECTATIONS:|$)/);
+      const expectationsMatch = aiResponse.match(/EXPECTATIONS:\s*([\s\S]+?)(?=\nSTRUCTURED_|$)/);
+      const structuredMatch = aiResponse.match(new RegExp(`STRUCTURED_${outputFormat.toUpperCase()}:\\s*([\\s\\S]+)`));
+      
+      return {
+        sentiment: sentimentMatch?.[1]?.trim() || "Not detected",
+        intent: intentMatch?.[1]?.trim() || "Not detected",
+        requirements: requirementsMatch?.[1]?.trim() || "Not detected",
+        expectations: expectationsMatch?.[1]?.trim() || "Not detected",
+        structured: structuredMatch?.[1]?.trim() || "No structured output generated"
+      };
+    } catch (err) {
+      console.error("Error parsing AI response:", err);
+      return {
+        sentiment: "Error parsing response",
+        intent: "Error parsing response",
+        requirements: "Error parsing response",
+        expectations: "Error parsing response",
+        structured: "Error parsing response"
+      };
+    }
   };
 
   const showNotification = (message: string, type: string) => {

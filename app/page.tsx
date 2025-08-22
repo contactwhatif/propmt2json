@@ -86,24 +86,22 @@ export default function Home() {
         if (!supaSession.user.user_metadata?.industry) {
           setShowIndustryForm(true);
         }
-        // Save user data to profiles table if it doesn't exist
+        // Upsert user data to profiles table (insert or update)
         try {
-          const { data: existingProfile } = await supabase
+          const { error: upsertError } = await supabase
             .from('profiles')
-            .select('*')
-            .eq('id', supaSession.user.id)
-            .single();
-          if (!existingProfile) {
-            await supabase
-              .from('profiles')
-              .insert([{ 
-                id: supaSession.user.id, 
-                email: supaSession.user.email ?? '', 
-                industry: supaSession.user.user_metadata?.industry || '' 
-              }]);
+            .upsert([
+              {
+                id: supaSession.user.id,
+                email: supaSession.user.email ?? '',
+                industry: supaSession.user.user_metadata?.industry || ''
+              }
+            ], { onConflict: 'id' });
+          if (upsertError) {
+            console.error('Error upserting user profile:', upsertError);
           }
         } catch (error) {
-          console.error('Error saving user profile:', error);
+          console.error('Error upserting user profile:', error);
         }
       }
       setLoadingSession(false);
@@ -129,24 +127,22 @@ export default function Home() {
           if (!authSession.user.user_metadata?.industry) {
             setShowIndustryForm(true);
           }
-          // Save user data to profiles table if it doesn't exist
+          // Upsert user data to profiles table (insert or update)
           try {
-            const { data: existingProfile } = await supabase
+            const { error: upsertError } = await supabase
               .from('profiles')
-              .select('*')
-              .eq('id', authSession.user.id)
-              .single();
-            if (!existingProfile) {
-              await supabase
-                .from('profiles')
-                .insert([{ 
-                  id: authSession.user.id, 
-                  email: authSession.user.email ?? '', 
-                  industry: authSession.user.user_metadata?.industry || '' 
-                }]);
+              .upsert([
+                {
+                  id: authSession.user.id,
+                  email: authSession.user.email ?? '',
+                  industry: authSession.user.user_metadata?.industry || ''
+                }
+              ], { onConflict: 'id' });
+            if (upsertError) {
+              console.error('Error upserting user profile:', upsertError);
             }
           } catch (error) {
-            console.error('Error saving user profile:', error);
+            console.error('Error upserting user profile:', error);
           }
         } else {
           setSession(null);
@@ -162,6 +158,10 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!session) {
+      showNotification("Please log in to generate structured output.", "error");
+      return;
+    }
     if (!userPrompt.trim()) {
       showNotification("Please enter a prompt", "error");
       return;
@@ -383,7 +383,7 @@ export default function Home() {
               
               {/* GitHub Repository Link */}
               <a 
-                href="https://github.com/contactwhatif/propmt2json.git" 
+                href="https://github.com/yourusername/ai-prompt-structurer" 
                 target="_blank" 
                 className="p-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 transition-colors"
                 title="View on GitHub"

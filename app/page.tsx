@@ -185,7 +185,7 @@ export default function Home() {
     const outputFormat = form.get("outputFormat");
 
     try {
-      // Get the access token from the session
+      // Refresh the session to ensure the latest access token
       const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !supaSession) {
         showNotification("Session expired. Please log in again.", "error");
@@ -193,6 +193,19 @@ export default function Home() {
         setLoading(false);
         return;
       }
+      // Update local session to ensure consistency
+      const mappedSession: SupabaseSession = {
+        ...supaSession,
+        user: {
+          ...supaSession.user,
+          email: supaSession.user.email,
+        }
+      };
+      setSession(mappedSession);
+      localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
+
+      // Small delay to ensure session propagation (workaround for Supabase token sync issues)
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const res = await fetch("/api/prompt", {
         method: "POST",
@@ -508,7 +521,7 @@ export default function Home() {
                   <div className="grid grid-cols-3 gap-4">
                     {["json", "markdown", "xml"].map((format) => (
                       <label key={format} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer border-2 border-gray-200 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-                        <input type="radio" name="outputFormat" value={format} defaultChecked={format === "json"} className="mr-3 h-4 w-4 text-blue-600" />
+                        <input type="radio" name="outputFormat" value="format} defaultChecked={format === "json"} className="mr-3 h-4 w-4 text-blue-600" />
                         <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">{format}</span>
                       </label>
                     ))}

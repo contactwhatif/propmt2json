@@ -167,80 +167,94 @@ export default function Home() {
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!session) {
-      showNotification("Please log in to generate structured output.", "error");
-      setLoading(false);
-      return;
-    }
-    if (!userPrompt.trim()) {
-      showNotification("Please enter a prompt", "error");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setResult(null);
-    const form = new FormData(e.target as HTMLFormElement);
-    const promptType = form.get("promptType");
-    const outputFormat = form.get("outputFormat");
+  e.preventDefault();
+  if (!session) {
+    showNotification("Please log in to generate structured output.", "error");
+    setLoading(false);
+    return;
+  }
+  if (!userPrompt.trim()) {
+    showNotification("Please enter a prompt", "error");
+    setLoading(false);
+    return;
+  }
+  setLoading(true);
+  setResult(null);
+  const form = new FormData(e.target as HTMLFormElement);
+  const promptType = form.get("promptType");
+  const outputFormat = form.get("outputFormat");
 
-    try {
-      // Refresh the session to ensure the latest access token
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.error("Session refresh error:", refreshError);
-      }
+  try {
+    // Force session refresh to ensure a valid token
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshedSession) {
+      throw new Error("Failed to refresh session. Please log in again.");
+    }
 
-      const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !supaSession) {
-        showNotification("Session expired. Please log in again.", "error");
-        console.error("Session error:", sessionError?.message || "No session");
-        setLoading(false);
-        return;
+    const { data: { session: supaSession }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !supaSession) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    // Update local session state
+    const mappedSession: SupabaseSession = {
+      ...supaSession,
+      user: {
+        ...supaSession.user,
+        email: supaSession.user.email,
       }
-      // Update local session to ensure consistency
-      const mappedSession: SupabaseSession = {
-        ...supaSession,
-        user: {
-          ...supaSession.user,
-          email: supaSession.user.email,
+    };
+    setSession(mappedSession);
+    localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
+
+    // Ensure user exists in profiles table
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert([
+        {
+          id: supaSession.user.id,
+          email: supaSession.user.email ?? '',
+          industry: supaSession.user.user_metadata?.industry || ''
         }
-      };
-      setSession(mappedSession);
-      localStorage.setItem('supabaseSession', JSON.stringify(mappedSession));
-
-      // Small delay to ensure session propagation (workaround for Supabase token sync issues)
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const res = await fetch("/api/prompt", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${supaSession.access_token}`
-        },
-        body: JSON.stringify({ promptType, outputFormat, userPrompt }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `API request failed with status ${res.status}`);
-      }
-      if (!data.aiResponse) {
-        throw new Error("No AI response received");
-      }
-      const parsedResult = parseResponse(data.aiResponse, outputFormat as string);
-      setResult(parsedResult);
-    } catch (err) {
-      console.error("Error in handleSubmit:", err);
-      if (err instanceof Error) {
-        showNotification(err.message, "error");
-      } else {
-        showNotification("An unknown error occurred", "error");
-      }
-    } finally {
-      setLoading(false);
+      ], { onConflict: 'id' });
+    if (upsertError) {
+      console.error("Error upserting profile:", upsertError);
     }
-  };
+
+    // Delay to ensure session and profile sync
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const res = await fetch("/api/prompt", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supaSession.access_token}`
+      },
+      body: JSON.stringify({ promptType, outputFormat, userPrompt }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `API request failed with status ${res.status}`);
+    }
+    if (!data.aiResponse) {
+      throw new Error("No AI response received");
+    }
+    const parsedResult = parseResponse(data.aiResponse, outputFormat as string);
+    setResult(parsedResult);
+  } catch (err) {
+    console.error("Error in handleSubmit:", err);
+    if (err instanceof Error) {
+      showNotification(err.message, "error");
+    } else {
+      showNotification("An unknown error occurred", "error");
+    }
+    // Ensure loading stops even on error
+    setLoading(false);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const parseResponse = (aiResponse: string, outputFormat: string) => {
     try {

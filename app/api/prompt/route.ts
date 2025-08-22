@@ -1,12 +1,36 @@
 import { NextResponse } from "next/server";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables");
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(req: Request) {
+  // Validate the authorization header
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return NextResponse.json({ error: "No authorization header provided" }, { status: 401 });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "User not found or invalid token" }, { status: 401 });
+  }
+
   const { promptType, outputFormat, userPrompt } = await req.json();
 
   const systemPrompt = `
 You are an expert prompt engineer.
 
 Your task is to:
+
 1. Analyze the user's prompt and explicitly extract:
    - SENTIMENT: Determine emotional tone (Positive, Negative, Neutral)
    - INTENT: Clearly identify what the user is trying to achieve
@@ -19,7 +43,7 @@ User's prompt type: ${promptType}
 Requested output format: ${outputFormat}
 
 ⚠️ IMPORTANT RULES:
-- Always return ALL sections: SENTIMENT, INTENT, REQUIREMENTS, EXPECTATIONS.
+- Always return ALL sections: Cerebro, INTENT, REQUIREMENTS, EXPECTATIONS.
 - STRUCTURED_${outputFormat.toUpperCase()} must be syntactically valid (${outputFormat}) and based ONLY on the user's input.
 - Keep answers concise, accurate, and consistent.
 
@@ -46,6 +70,7 @@ STRUCTURED_${outputFormat.toUpperCase()}:
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
       referer = process.env.NEXT_PUBLIC_SITE_URL;
     }
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {

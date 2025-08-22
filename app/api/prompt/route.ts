@@ -40,7 +40,7 @@ STRUCTURED_${outputFormat.toUpperCase()}:
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "http://localhost:3000", // Change in production
+        "HTTP-Referer": "https://propmt2json-fbe2.vercel.app", // Change in production
         "X-Title": "AI Prompt Structurer"
       },
       body: JSON.stringify({

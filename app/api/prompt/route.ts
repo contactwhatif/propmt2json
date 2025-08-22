@@ -59,7 +59,11 @@ STRUCTURED_${outputFormat.toUpperCase()}:
     }
 
     return NextResponse.json({ aiResponse: data.choices[0].message.content });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    } else {
+      return NextResponse.json({ error: "Unknown error occurred" }, { status: 500 });
+    }
   }
 }

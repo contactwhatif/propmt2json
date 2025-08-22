@@ -1,32 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) {
-    console.error("No authorization header provided");
-    return NextResponse.json({ error: "No authorization header provided" }, { status: 401 });
-  }
-
-  const token = authHeader.replace("Bearer ", "");
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-  if (authError || !user) {
-    console.error("User authentication failed:", authError?.message || "No user found", "Token:", token);
-    return NextResponse.json({ error: "User not found or invalid token" }, { status: 401 });
-  }
-
-  console.log("Authenticated user:", user.email, "ID:", user.id);
-
   let body;
   try {
     body = await req.json();

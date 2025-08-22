@@ -35,12 +35,19 @@ STRUCTURED_${outputFormat.toUpperCase()}:
 `;
 
   try {
+    // Dynamically set HTTP-Referer based on environment
+    let referer = "http://localhost:3000";
+    if (process.env.VERCEL_URL) {
+      referer = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      referer = process.env.NEXT_PUBLIC_SITE_URL;
+    }
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://propmt2json-fbe2.vercel.app", // Change in production
+        "HTTP-Referer": referer,
         "X-Title": "AI Prompt Structurer"
       },
       body: JSON.stringify({

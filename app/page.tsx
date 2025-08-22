@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaBuilding, FaTimes, FaCheck } from "react-icons/fa";
-import { useTheme } from "next-themes";
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
@@ -17,7 +16,7 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
-  const { theme, setTheme } = useTheme();
+ 
   
   // Authentication states
   const [session, setSession] = useState<any>(null);

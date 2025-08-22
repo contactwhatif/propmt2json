@@ -65,11 +65,11 @@ export default function Home() {
 
   const parseResponse = (aiResponse: string, outputFormat: string) => {
     try {
-      const sentimentMatch = aiResponse.match(/SENTIMENT:\s*([\s\S]+?)(?=\nINTENT:|$)/);
-      const intentMatch = aiResponse.match(/INTENT:\s*([\s\S]+?)(?=\nREQUIREMENTS:|$)/);
-      const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([\s\S]+?)(?=\nEXPECTATIONS:|$)/);
-      const expectationsMatch = aiResponse.match(/EXPECTATIONS:\s*([\s\S]+?)(?=\nSTRUCTURED_|$)/);
-      const structuredMatch = aiResponse.match(new RegExp(`STRUCTURED_${outputFormat.toUpperCase()}:\\s*([\\s\\S]+)`));
+      const sentimentMatch = aiResponse.match(/SENTIMENT:\s*([^]*?)(?=\nINTENT:|$)/);
+      const intentMatch = aiResponse.match(/INTENT:\s*([^]*?)(?=\nREQUIREMENTS:|$)/);
+      const requirementsMatch = aiResponse.match(/REQUIREMENTS:\s*([^]*?)(?=\nEXPECTATIONS:|$)/);
+      const expectationsMatch = aiResponse.match(/EXPECTATIONS:\s*([^]*?)(?=\nSTRUCTURED_[^:]+|$)/);
+      const structuredMatch = aiResponse.match(new RegExp(`STRUCTURED_${outputFormat.toUpperCase()}:\\s*([^]*)`, 's'));
       
       return {
         sentiment: sentimentMatch?.[1]?.trim() || "Not detected",

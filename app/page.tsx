@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { FaLinkedinIn, FaWhatsapp, FaGithub, FaInstagram, FaComment, FaSignOutAlt, FaUser, FaTimes, FaCheck } from "react-icons/fa";
 // import { useTheme } from "next-themes";
 import { createClient } from '@supabase/supabase-js';
+import Image from "next/image";
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -557,7 +558,14 @@ export default function Home() {
               <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-6 text-white">
                 <div className="flex items-center">
                   <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                    <img src="https://i.ibb.co/7x73HBx7/Whats-App-Image-2025-06-21-at-21-58-01-d6042a8a.jpg" alt="Profile" className="w-full h-full object-cover" />
+                    <Image
+                      src="https://i.ibb.co/7x73HBx7/Whats-App-Image-2025-06-21-at-21-58-01-d6042a8a.jpg"
+                      alt="Profile"
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                      priority
+                    />
                   </div>
                   <div className="ml-4">
                     <h2 className="text-xl font-bold">Siva Sakthi</h2>

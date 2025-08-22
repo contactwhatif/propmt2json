@@ -14,6 +14,7 @@ export async function POST(req: Request) {
   // Validate the authorization header
   const authHeader = req.headers.get("authorization");
   if (!authHeader) {
+    console.error("No authorization header provided");
     return NextResponse.json({ error: "No authorization header provided" }, { status: 401 });
   }
 
@@ -21,10 +22,24 @@ export async function POST(req: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
+    console.error("User authentication failed:", authError?.message || "No user found");
     return NextResponse.json({ error: "User not found or invalid token" }, { status: 401 });
   }
 
-  const { promptType, outputFormat, userPrompt } = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    console.error("Failed to parse request body:", err);
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { promptType, outputFormat, userPrompt } = body;
+
+  if (!promptType || !outputFormat || !userPrompt) {
+    console.error("Missing required fields:", { promptType, outputFormat, userPrompt });
+    return NextResponse.json({ error: "Missing required fields: promptType, outputFormat, or userPrompt" }, { status: 400 });
+  }
 
   const systemPrompt = `
 You are an expert prompt engineer.
@@ -43,7 +58,7 @@ User's prompt type: ${promptType}
 Requested output format: ${outputFormat}
 
 ⚠️ IMPORTANT RULES:
-- Always return ALL sections: Cerebro, INTENT, REQUIREMENTS, EXPECTATIONS.
+- Always return ALL sections: SENTIMENT, INTENT, REQUIREMENTS, EXPECTATIONS.
 - STRUCTURED_${outputFormat.toUpperCase()} must be syntactically valid (${outputFormat}) and based ONLY on the user's input.
 - Keep answers concise, accurate, and consistent.
 
@@ -61,14 +76,18 @@ STRUCTURED_${outputFormat.toUpperCase()}:
   try {
     // Dynamically set HTTP-Referer from request headers if possible
     let referer = "http://localhost:3000";
-    const reqHeaders = req.headers;
-    const origin = reqHeaders.get ? reqHeaders.get("origin") : null;
+    const origin = req.headers.get("origin");
     if (origin) {
       referer = origin;
     } else if (process.env.VERCEL_URL) {
       referer = `https://${process.env.VERCEL_URL}`;
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
       referer = process.env.NEXT_PUBLIC_SITE_URL;
+    }
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("Missing OPENROUTER_API_KEY");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -91,15 +110,21 @@ STRUCTURED_${outputFormat.toUpperCase()}:
     const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message || "API request failed" }, { status: 500 });
+      console.error("OpenRouter API request failed:", data.error?.message || response.statusText);
+      return NextResponse.json({ error: data.error?.message || "API request failed" }, { status: response.status });
+    }
+
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      console.error("Invalid OpenRouter response format:", data);
+      return NextResponse.json({ error: "Invalid response from AI service" }, { status: 500 });
     }
 
     return NextResponse.json({ aiResponse: data.choices[0].message.content });
   } catch (err) {
+    console.error("Error in API route:", err);
     if (err instanceof Error) {
       return NextResponse.json({ error: err.message }, { status: 500 });
-    } else {
-      return NextResponse.json({ error: "Unknown error occurred" }, { status: 500 });
     }
+    return NextResponse.json({ error: "Unknown error occurred" }, { status: 500 });
   }
 }

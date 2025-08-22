@@ -35,9 +35,13 @@ STRUCTURED_${outputFormat.toUpperCase()}:
 `;
 
   try {
-    // Dynamically set HTTP-Referer based on environment
+    // Dynamically set HTTP-Referer from request headers if possible
     let referer = "http://localhost:3000";
-    if (process.env.VERCEL_URL) {
+    const reqHeaders = req.headers;
+    const origin = reqHeaders.get ? reqHeaders.get("origin") : null;
+    if (origin) {
+      referer = origin;
+    } else if (process.env.VERCEL_URL) {
       referer = `https://${process.env.VERCEL_URL}`;
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
       referer = process.env.NEXT_PUBLIC_SITE_URL;
